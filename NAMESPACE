@@ -1,0 +1,27 @@
+export(
+  j2,
+  p2,
+  b2ML,
+  p2ML,
+  j2ML
+)
+
+# used internally - not intended to be visible to users
+# j2 model
+# llj2
+# p2model
+# llp2
+# effectiveEst
+
+importFrom("mvtnorm", "dmvnorm")
+importFrom("stats", "cov", "model.matrix", "quantile", "rWishart",
+           "runif", "sd", "var", "dnorm")
+importFrom("MASS", "ginv")
+importFrom("CholWishart", "rInvWishart")
+importFrom("RcppZiggurat", "zsetseed")
+importFrom("Rfast", "rmvnorm", "dmvt")
+#importFrom("plyr", "rbind.fill.matrix")
+#importFrom("utils", "txtProgressBar")
+
+S3method(summary, "b2ML")
+S3method(summary, "2ML")
