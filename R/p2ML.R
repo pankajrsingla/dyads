@@ -166,6 +166,10 @@ p2ML <- function (nets, sender = NULL, receiver = NULL, density =~ 1, reciprocit
   pVr <- diag(pScaler^2, nrow=nr)
   pmbr <- c(pmb[c(subb)], pmr[subr])
   pVbr <- diag(c(sigmapar[c(subb)]^2, pScaler[subr]^2))
+  pmbSubb <- pmb[c(subb)]
+  pmrSubr <- pmr[c(subr)]
+  pVbSubb <- as.matrix(pVb[c(subb), c(subb)])
+  pVrSubr <- as.matrix(pVr[c(subr), c(subr)])
   invrho <- 1/pSDg4^2
   Xrho <- rep(1, nnets)
   pdfC <- 3
@@ -381,25 +385,36 @@ p2ML <- function (nets, sender = NULL, receiver = NULL, density =~ 1, reciprocit
     accR <- rep(0, nnets)
     for (j in 1:Sadapt){ 
       num <- ((i-1)*Sadapt + j)
-      beta2 <- beta 
-      beta2[c(subb)] <- beta[c(subb)] +as.vector(Rfast::rmvnorm(1,pmb[c(subb)], covRWADb))
+      if (length(beta[c(subb)]) > 0){
+        beta2 <- beta 
+        beta2[c(subb)] <- beta[c(subb)] +as.vector(Rfast::rmvnorm(1,pmb[c(subb)], covRWADb))
+        ll2C <- lapply(1:nnets, function(k){llp2ML(yl[[k]], nets[[k]], Xl[[k]], X4l[[k]], c(beta2[1:nb], beta2[subCnets==k]), g4, Ml[[k]], Myl[[k]], Rl[[k]], rInd[[k]])})
+        ll2 <- unlist(lapply(1:nnets, function(k){sum(ll2C[[k]])}))
+        ll1b <- sum(ll1) + Rfast::dmvt(t(c(beta[subb])), mu= pmbSubb, sigma= pVbSubb, nu=7, logged = TRUE)
+        ll2b <- sum(ll2) + Rfast::dmvt(t(c(beta2[subb])), mu= pmbSubb, sigma= pVbSubb, nu=7, logged = TRUE)
+        if (runif(1, min = 0, max = 1) <  min(1, exp(ll2b-ll1b))){
+          bsimsAD[((i-1)*Sadapt + j), ] <- beta2
+          beta <- beta2
+          ll1 <- ll2
+          ll1C <- ll2C
+          accb <- accb + 1
+        } else {
+          bsimsAD[((i-1)*Sadapt + j), ] <- beta
+        }
+      }  
       g4s <- g4
       g4s[c(subr)] <- g4[c(subr)] + as.vector(Rfast::rmvnorm(1, pmr[c(subr)], covRWADr))
-      ll2C <- lapply(1:nnets, function(k){llp2ML(yl[[k]], nets[[k]], Xl[[k]], X4l[[k]], c(beta2[1:nb], beta2[subCnets==k]), g4s, Ml[[k]], Myl[[k]], Rl[[k]], rInd[[k]])})
+      ll2C <- lapply(1:nnets, function(k){llp2ML(yl[[k]], nets[[k]], Xl[[k]], X4l[[k]], c(beta[1:nb], beta[subCnets==k]), g4s, Ml[[k]], Myl[[k]], Rl[[k]], rInd[[k]])})
       ll2 <- unlist(lapply(1:nnets, function(k){sum(ll2C[[k]])}))
-      ll1br <- sum(ll1) + Rfast::dmvt(t(c(beta[c(subb)], g4[subr])), mu= pmbr, sigma= pVbr, nu=7, logged = TRUE)
-      ll2br <- sum(ll2) + Rfast::dmvt(t(c(beta2[c(subb)], g4s[subr])), mu= pmbr, sigma= pVbr, nu=7, logged = TRUE)
-      if (runif(1, min = 0, max = 1) <  min(1, exp(ll2br-ll1br))){
-        bsimsAD[((i-1)*Sadapt + j), ] <- beta2
-        beta <- beta2
+      ll1r <- sum(ll1) + Rfast::dmvt(t(c(g4[c(subr)])), mu= pmrSubr, sigma= pVrSubr, nu=7, logged = TRUE)
+      ll2r <- sum(ll2) + Rfast::dmvt(t(c(g4s[c(subr)])), mu= pmrSubr, sigma= pVrSubr, nu=7, logged = TRUE)
+      if (runif(1, min = 0, max = 1) <  min(1, exp(ll2r-ll1r))){
         rsimsAD[((i-1)*Sadapt + j),] <- g4s
         g4 <- g4s
         ll1 <- ll2
         ll1C <- ll2C
-        accb <- accb + 1
         accr <- accr + 1
       } else {
-        bsimsAD[((i-1)*Sadapt + j), ] <- beta
         rsimsAD[((i-1)*Sadapt + j),] <- g4
       }
       # random actor effects
@@ -522,20 +537,22 @@ p2ML <- function (nets, sender = NULL, receiver = NULL, density =~ 1, reciprocit
     sumgacc <- gacc*i
     sumaccb <- sumaccb + accb
     fc <- 1/sqrt(i)
-    if (sumaccb > sumgacc){
-      Sba <- Sba*(1+(1-(sumSadapt-sumaccb)/(sumSadapt-sumgacc)))  
-    } else {
-      Sba <- Sba/(1+(1-(sumaccb/sumgacc)))
+    if (length(beta[c(subb)]) > 0){
+      if (sumaccb > sumgacc){
+        Sba <- Sba*(1+(1-(sumSadapt-sumaccb)/(sumSadapt-sumgacc)))  
+      } else {
+        Sba <- Sba/(1+(1-(sumaccb/sumgacc)))
+      }
+      if (accb > gacc){
+        Sbb <- Sbb*(1+fc*(1-(Sadapt-accb)/(Sadapt-gacc)))  
+      } else {
+        Sbb <- Sbb/(1+fc*(1-(accb/gacc)))
+      }
+      Sb <- Sbb
+      Sbt[i] <- Sb
+      covRWADb <- Sb*cov(as.matrix(bsimsAD[,subb]), use= "complete.obs")
+      if (length(eigen(covRWADb)$values[eigen(covRWADb)$values >1*10^-15]) < length(subb)){diag(covRWADb) <- diag(covRWADb) + 1*10^-10}
     }
-    if (accb > gacc){
-      Sbb <- Sbb*(1+fc*(1-(Sadapt-accb)/(Sadapt-gacc)))  
-    } else {
-      Sbb <- Sbb/(1+fc*(1-(accb/gacc)))
-    }
-    Sb <- Sbb
-    Sbt[i] <- Sb
-    covRWADb <- Sb*cov(as.matrix(bsimsAD[,subb]), use= "complete.obs")
-    if (length(eigen(covRWADb)$values[eigen(covRWADb)$values >1*10^-15]) < length(subb)){diag(covRWADb) <- diag(covRWADb) + 1*10^-10}
     sumaccr <- sumaccr + accr
     if (sumaccr > sumgacc){
       Sra <- Sra*(1+(1-(sumSadapt-sumaccr)/(sumSadapt-sumgacc)))  
