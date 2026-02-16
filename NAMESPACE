@@ -23,5 +23,5 @@ importFrom("Rfast", "rmvnorm", "dmvt")
 #importFrom("plyr", "rbind.fill.matrix")
 #importFrom("utils", "txtProgressBar")
 
-S3method(summary, "b2ML")
-S3method(summary, "2ML")
+S3method(summary, "b2MLb")
+S3method(summary, "2MLb")

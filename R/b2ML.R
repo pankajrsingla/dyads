@@ -1,15 +1,16 @@
-b2ML <- function (nets, actor = NULL, density = NULL, adapt = NULL, burnin = NULL, center = NULL, separate= NULL, densVar = NULL, seed = NULL) 
+b2ML <- function (nets, actor = NULL, density = NULL, adapt = NULL, burnin = NULL, center = NULL, separateSigma= NULL, densVar = NULL, seed = NULL) 
 {
   # sampling parameters
   if(!is.null(adapt)){
     Nadapt <- adapt
   } else {
-    Nadapt <- 100
+    Nadapt <- 250
   } 
   nccyc <- 1
   Sadapt <- 125
   gacc <- round(Sadapt*.234)
   gaccC <- round(Sadapt*.234)
+  gaccM <- round(Sadapt*.44)
   gaccMt <- round(Sadapt*.234)
   if(!is.null(burnin)){
     NburnR <- burnin
@@ -25,10 +26,10 @@ b2ML <- function (nets, actor = NULL, density = NULL, adapt = NULL, burnin = NUL
   } else {
     center <- TRUE
   } 
-  if(!is.null(separate)){
-    separate <- separate
+  if(!is.null(separateSigma)){
+    separateSigma <- separateSigma
   } else {
-    separate <- FALSE
+    separateSigma <- FALSE
   } 
   if(!is.null(densVar)){
     densVar <- densVar
@@ -44,7 +45,7 @@ b2ML <- function (nets, actor = NULL, density = NULL, adapt = NULL, burnin = NUL
   } 
   # obtain model
   nnets <- length(nets)
-  model <- b2modelB2ML1l(nets, actor, density, center, separate, densVar)
+  model <- b2modelB2ML1lb(nets, actor, density, center, densVar)
   yl <- model$yl
   Xl <- model$Xl
   X1 <- model$X1
@@ -61,6 +62,7 @@ b2ML <- function (nets, actor = NULL, density = NULL, adapt = NULL, burnin = NUL
   nre <- model$nre
   nd <- model$nd
   nr <- model$nr
+  densVar <- model$densVar
   nrandd <- model$nrandd
   nrandr <- model$nrandr
   netnums <- model$netnums
@@ -69,8 +71,7 @@ b2ML <- function (nets, actor = NULL, density = NULL, adapt = NULL, burnin = NUL
   nrows <- model$nrows
   netrows <- unlist(lapply(1:nnets, function(k){rep(k, nrows[k])}))
   if (nrandd>0){drandd <- 1} else {drandd <- 0}
-  if (nrandr>0){drandr <- 1} else {drandr <- 0}
-  if (separate == FALSE){overalld <- 1; overallr <- 1} else {overalld <- 0; overallr <- 0}
+  if (densVar == TRUE | nnets == 1){overalld <- 1} else {overalld <- 0}
   # number of parameters
   nb <- ns+ nre+ nd
   nrand <- nact*2
@@ -84,24 +85,15 @@ b2ML <- function (nets, actor = NULL, density = NULL, adapt = NULL, burnin = NUL
   subCHCnets <- c(netnums, netnums + nnets)
   subCnets2 <- c(rep(0, nb[1]), netnums, netnums+nnets)
   subS1nets <- rep(1:nnets, each=nvarpar^2)
-  if ((separate == FALSE) & (nnets > 1) & (densVar == TRUE)){
-    subb <- -c(if ((ns+nre)>0) 1:(ns+nre), drandd*((ns+nre+1):(ns+nre+nnets+1)),(nb+1):npar)
-    if((ns+nre)==0){
-      subb <- -c(if ((ns+nre)>0) 1:(ns+nre), drandd*((ns+nre+1):(ns+nre+nnets+1)),(nb+1):npar)
-    }
-    subr <- -c(drandr*((overallr):(overallr+nrandr)))
-    if((nr-nrandr)==1){
-      subr <- -c(drandr*((overallr+1):(overallr+nrandr)))
-    }
+  if ((nnets > 1)){
+    subb <- -c(drandd*((ns+nre+overalld+1):(ns+nre+nnets+overalld)),(nb+1):npar)
     subm <- c(ns+nre+1)
     subd <- c((ns+nre+1): nd)
-    subM <- c((ns+nre+2):(ns+nre+nrandd+1))
-    subR <- c((overallr+1):(overallr+nrandr))
+    subM <- c((ns+nre+overalld+1):(ns+nre+nrandd+overalld))
     subs <- c(if((ns)>0) 1:(ns))
     subre <- c(if((nre)>0) (1+ns):(ns+nre))
   } else {
-    subb <- c((ns+nre+2):nb)
-    subr <- c(1:nr)
+    subb <- c((1):nb)
     subm <- c(ns+nre+1)
     subd <- c((ns+nre+1): nd)
     subM <- NA
@@ -111,41 +103,13 @@ b2ML <- function (nets, actor = NULL, density = NULL, adapt = NULL, burnin = NUL
   # prior distributions
   pSDb <- 3
   pSDbsq <- pSDb^2
-  sigmab <- c(if (ns>0) {pSDb/apply(X1, 2, sd)}, if (nre>0) {pSDb/apply(X2, 2, sd)}, if (separate == FALSE) {pSDb}, if (nrandd>0) {rep(pSDb*sqrt(nnets), nnets)}, if ((nd-(as.numeric(nnets>1))*nnets-overalld)>0) {pSDb/apply(X3[,((as.numeric(nnets>1))*nnets+overalld+1):nd, drop=F], 2, sd)})
+  sigmab <- c(if (ns>0) {pSDb/apply(X1, 2, sd)}, if (nre>0) {pSDb/apply(X2, 2, sd)}, if (densVar == TRUE | nnets == 1) {pSDb}, if (nrandd>0) {rep(pSDb*sqrt(nnets), nnets)}, if ((nd-(as.numeric(nnets>1))*nnets-overalld)>0) {pSDb/apply(X3[,((as.numeric(nnets>1))*nnets+overalld+1):nd, drop=F], 2, sd)})
   sigmab[is.infinite(sigmab)] <- pSDb
   sigmaR <- 1
   sigmapar <- c(sigmab, rep(sigmaR, nrand))
   pmb <- as.vector(rep(0, npar))
   pVb <- diag(sigmapar^2)
   pmr <- as.vector(rep(0, nr))
-  invmu <- 1/pSDb^2
-  invCmu <- 1/((0.5*pSDb)^2)
-  Xmu <- rep(1, nnets)
-  XCmu <- rep(1, nact)
-  if ((separate == FALSE) & (nnets > 1) & (densVar == TRUE)){
-    XCAREmu <- cbind(rep(1, nact),matrix(unlist(lapply(1:(nnets), function(k){as.numeric(netnums==k)})), ncol=nnets))
-  } else {
-    XCAREmu <- rep(1, nact)
-  }
-  if (nre > 0){
-    XCAREmu <- cbind(XCAREmu, XRE)
-  }
-  varHCmu <- diag(nact*2)
-  varHCAmu <- diag(nact)
-  XCm <- matrix(unlist(lapply(1:nnets, function(k){as.numeric(netnums==k)})), ncol=nnets)
-  invCovRe <- list()
-  if (nre > 0){
-    for (k in 1:nnets){
-      invCovRe[[k]] <- diag((1/(pSDb/apply(as.matrix(XRE[netnums==k,], ncol= nre), 2, sd))^2), ncol= nre)
-      for (l in 1:nre){
-        if (is.infinite(invCovRe[[k]][l,l])){invCovRe[[k]][l,l] <- pSDb}
-      }
-    }
-  }
-  if (nre>0){
-    invCovReTot <- diag((1/(pSDb/apply(as.matrix(XRE, ncol= nre), 2, sd))^2), ncol= nre)
-  }
-  invCovmM <- diag(1/(sigmab[(ns+nre+1):(ns+nre+overalld+nrandd)]))
   pmbr <- c(pmb[c(subb)])
   pVbr <- diag(as.numeric(sigmapar[c(subb)]^2), nrow = length(sigmapar[c(subb)]))
   Xrho <- rep(1, nnets)
@@ -282,24 +246,18 @@ b2ML <- function (nets, actor = NULL, density = NULL, adapt = NULL, burnin = NUL
   VRR <- DR * varS3
   # intialiseer random effecten op waarden ongelijk aan nul
   beta[c(subC)] <- rep(Ccenter(Rfast::rmvnorm(nact, mu= c(0), sigma= pVC[1,1]), netnums), 2)
-  if ((separate == FALSE) & (nnets > 1) & (densVar == TRUE)){
-    beta[c(subM)] <- scale(as.vector(Rfast::rmvnorm(nrandd, c(0), pVM)), center=TRUE, scale=FALSE)
-    g4[c(subR)] <- scale(as.vector(Rfast::rmvnorm(nrandr, c(0), pVR)), center=TRUE, scale=FALSE) 
+  if ((nnets > 1)){
+    beta[c(subM)] <- rep(c(0), nrandd)
+    rwM <- rep(c(0), nrandd)
     m <- beta[c(subM)]
     mtmp <- beta[c(subM)]
-    r <- g4[c(subR)]
-    rtmp <- g4[c(subR)] 
     m2Tot <- nnets
-    r2Tot <- nnets
     mTot <- m
-    rTot <- r
   } else {
     m <- rep(0, nnets)
     mtmp <- as.vector(rep(0, nnets))
-    r <- rep(0, nnets)
     rtmp <- rep(0, nnets) 
     m2Tot <- 1
-    r2Tot <- 1
   }
   ll1C <- lapply(1:nnets, function(k){llb2MLC(yl[[k]], nets[[k]], Xl[[k]], c(beta[1:nb], beta[subCnets==k]), Ml[[k]], Myl[[k]])})
   ll1 <- unlist(lapply(1:nnets, function(k){sum(ll1C[[k]])/2}))
@@ -322,6 +280,7 @@ b2ML <- function (nets, actor = NULL, density = NULL, adapt = NULL, burnin = NUL
   SvarS3 <- 1
   SMt <- 1
   SM <- rep(1, nnets)
+  SMb <- rep(1, nnets)
   SRt <- 1/nnets
   SR <- rep(1, nnets)
   SRa <- rep(1, nnets)
@@ -336,6 +295,7 @@ b2ML <- function (nets, actor = NULL, density = NULL, adapt = NULL, burnin = NUL
   accvarS1 <- rep(0, nnets)
   accvarS2 <- 0
   accvarS3 <- 0
+  accM <- rep(0, nnets)
   accR <- rep(0, nnets)
   sumaccR <- rep(0, nnets)
   Sbt <- rep(NA, Nadapt)
@@ -353,6 +313,7 @@ b2ML <- function (nets, actor = NULL, density = NULL, adapt = NULL, burnin = NUL
     accvarS2 <- 0
     accvarS3 <- 0
     accMt <- 0
+    accM <- rep(0, nnets)
     accRt <- 0
     accR <- rep(0, nnets)
     for (j in 1:Sadapt){ 
@@ -362,8 +323,8 @@ b2ML <- function (nets, actor = NULL, density = NULL, adapt = NULL, burnin = NUL
         beta2[c(subb)] <- beta[c(subb)] +as.vector(Rfast::rmvnorm(1,pmb[c(subb)], covRWADb))
         ll2C <- lapply(1:nnets, function(k){llb2MLC(yl[[k]], nets[[k]], Xl[[k]], c(beta2[1:nb], beta2[subCnets==k]), Ml[[k]], Myl[[k]])})
         ll2 <- unlist(lapply(1:nnets, function(k){sum(ll2C[[k]])/2}))
-        ll1br <- sum(ll1) + Rfast::dmvt(t(c(beta[c(subb)])), mu= pmbr, sigma= pVbr, nu=7, logged = TRUE)
-        ll2br <- sum(ll2) + Rfast::dmvt(t(c(beta2[c(subb)])), mu= pmbr, sigma= pVbr, nu=7, logged = TRUE)
+        ll1br <- sum(ll1) + Rfast::dmvnorm(t(c(beta[c(subb)])), mu= pmbr, sigma= pVbr, logged = TRUE)
+        ll2br <- sum(ll2) + Rfast::dmvnorm(t(c(beta2[c(subb)])), mu= pmbr, sigma= pVbr, logged = TRUE)
         if (runif(1, min = 0, max = 1) <  min(1, exp(ll2br-ll1br))){
           bsimsAD[((i-1)*Sadapt + j), ] <- beta2
           beta <- beta2
@@ -380,6 +341,7 @@ b2ML <- function (nets, actor = NULL, density = NULL, adapt = NULL, burnin = NUL
         beta2 <- beta
         for (k in 1:nnets){
           betaC2tmp[netnums==k,] <-  rep(Rfast::rmvnorm(nactnets[k], mu= c(0), sigma= covRWADC[[k]][1,1]), 2)
+          
         }
         c2 <- c + betaC2tmp
         beta2[c(subC)] <- beta[c(subC)] + as.vector(betaC2tmp)
@@ -396,66 +358,55 @@ b2ML <- function (nets, actor = NULL, density = NULL, adapt = NULL, burnin = NUL
         bsimsAD[((i-1)*Sadapt + j), c(subC)] <- as.vector(c)
         beta[subC] <- as.vector(c)
         ll1 <- unlist(lapply(1:nnets, function(k){sum(ll1C[[k]])/2}))
-        varS1tot <-  diag(rep(CholWishart::rInvWishart(1, postdfCtot, diag(diag(crossprod(c))) + CPC)[,,1][1,1], 2))
-        for (k in 1:nnets){
-          varS1[[k]] <- varS1tot
+        if (separateSigma == FALSE){
+          varS1tot <-  diag(rep(CholWishart::rInvWishart(1, postdfCtot, diag(diag(crossprod(c))) + CPC)[,,1][1,1], 2))
+          for (k in 1:nnets){
+            varS1[[k]] <- varS1tot
+          }
+        } else {
+          for (k in 1:nnets){
+            varS1[[k]] <-  diag(rep(CholWishart::rInvWishart(1, postdfC[k], diag(diag(crossprod(c[netnums==k,]))) + CPC)[,,1][1,1], 2))
+          }
         }
         varS1AD[((i-1)*Sadapt + j),] <- unlist(varS1)
         varCAD[((i-1)*Sadapt + j),] <- apply(simplify2array(varS1), 1:2, mean)
       }
-      if ((separate == FALSE) & (nnets > 1) & (densVar == TRUE)){
-        # draw M
-        invVarS1 <- t(sapply(lapply(1:nnets, function(k){chol2inv(chol(varS1[[k]]))}), '['))
-        tXCAREmuvarHCmu <- t(XCAREmu*(c(rep(invVarS1[,1], nactnets)))) 
-        if (nre>0){
-          covHCAmu <- chol2inv(chol(tXCAREmuvarHCmu%*%XCAREmu + diag(c(invCmu, rep(4/varS2, nnets), diag(invCovReTot)))))
-        } else {
-          covHCAmu <- chol2inv(chol(tXCAREmuvarHCmu%*%XCAREmu + diag(c(invCmu, rep(4/varS2, nnets)))))
-        }
-        ustarA <-  as.vector(c[,2])  + XCAREmu%*%c(beta[subm]/2, m/2, beta[(subre)])
-        mHCAmu <- covHCAmu%*%(tXCAREmuvarHCmu%*%ustarA)
-        munewA <- as.vector(Rfast::rmvnorm(1,mHCAmu, covHCAmu))
-        cA <- ustarA - XCAREmu%*%munewA
-        c <- matrix(rep(cA,2), ncol=2)
-        beta[subC]  <- as.vector(c)
-        beta[subm] <-  munewA[c(1)]*2
-        beta[subM] <-  munewA[2:(nnets+1)]*2
-        m <- beta[subM]
-        if (nre>0){
-          beta[subs] <- munewA[(1+nnets+1):(1+nnets+ns)]
-          beta[subre] <- beta[subs]
-        }
-        bsimsAD[((i-1)*Sadapt + j), ] <- beta
-      }   
-      if ((nnets == 1) | (densVar == FALSE)){
-        k <- 1
-        # draw m
-        invVarS1 <- t(sapply(lapply(1:nnets, function(k){chol2inv(chol(varS1[[k]]))}), '['))
-        tXCAREmuvarHCmu <- t(XCAREmu*(c(rep(invVarS1[,1], nactnets)))) 
-        if (nre>0){
-          covHCAmu <- chol2inv(chol(tXCAREmuvarHCmu%*%XCAREmu + diag(c(invCmu, diag(invCovReTot)))))
-        } else {
-          covHCAmu <- chol2inv(chol(tXCAREmuvarHCmu%*%XCAREmu + invCmu))
-        }
-        ustarA <-  as.vector(c[,2])  + XCAREmu%*%c(beta[subm]/2, beta[(subre)])
-        mHCAmu <- covHCAmu%*%(tXCAREmuvarHCmu%*%ustarA)
-        munewA <- as.vector(Rfast::rmvnorm(1,mHCAmu, covHCAmu))
-        cA <- ustarA - XCAREmu%*%munewA
-        c <- matrix(rep(cA,2), ncol=2)
-        beta[subC]  <- as.vector(c)
-        beta[subm] <-  munewA[c(1)]*2
-        if (nre>0){
-          beta[subs] <- munewA[2:(1+ns)]
-          beta[subre] <- beta[subs]
-        }
-        bsimsAD[((i-1)*Sadapt + j), ] <- beta
-      }  
       # random effects M 
-      if ((separate == FALSE) & (nnets > 1) & (densVar == TRUE)){
-        mMat <- m
-        varS2 <- CholWishart::rInvWishart(1, postdfM, crossprod(mMat) + CPM)[,,1]
-        VRM <- DM * varS2
-        varMAD[((i-1)*Sadapt + j),] <- varS2 
+      if ((nnets > 1)){
+        #
+        mOld <- m
+        beta2 <- beta
+        for (k in 1:nnets){
+          rwM[k] <-  Rfast::rmvnorm(1, mu= c(0), sigma= covRWADM[[k]])
+        }
+        m2 <-  beta[subM] + rwM
+        beta2[subM] <- m2
+        ll2C <- lapply(1:nnets, function(k){llb2MLC(yl[[k]], nets[[k]], Xl[[k]], c(beta2[1:nb], beta[subCnets==k]),  Ml[[k]], Myl[[k]])})
+        ll2 <- unlist(lapply(1:nnets, function(k){sum(ll2C[[k]])/2}))
+        if (densVar == TRUE) {
+          ll1M <- ll1 +  dnorm(m, mean= c(0), sd= sqrt(varS2), log = TRUE)
+          ll2M <- ll2 + dnorm(m2, mean= c(0), sd= sqrt(varS2), log = TRUE)
+        } else {
+          ll1M <- ll1 + dnorm(m, mean= c(0), sd= pSDb, log = TRUE)
+          ll2M <- ll2 + dnorm(m2, mean= c(0), sd= pSDb, log = TRUE)
+        }
+        for (k in 1:nnets) {
+          if (runif(1, min = 0, max = 1) <  min(1, exp(ll2M[k]-ll1M[k]))){
+            ll1C[[k]] <- ll2C[[k]]
+            accM[k] <- accM[k] +1
+            m[k] <- m2[k]
+          }
+        }
+        #
+        mMat <-  cbind(m)
+        beta[subM] <- m
+        bsimsAD[((i-1)*Sadapt + j), ] <- beta
+        ll1 <- unlist(lapply(1:nnets, function(k){sum(ll1C[[k]])/2}))
+        if (densVar == TRUE) {
+          varS2 <- CholWishart::rInvWishart(1, postdfM, crossprod(mMat) + CPM)[,,1]
+          VRM <- DM * varS2
+          varMAD[((i-1)*Sadapt + j),] <- varS2 
+        }
       }
       callback()
     }
@@ -490,22 +441,31 @@ b2ML <- function (nets, actor = NULL, density = NULL, adapt = NULL, burnin = NUL
       if (length(eigen(covRWADC[[k]])$values[eigen(covRWADC[[k]])$values >1*10^-15]) < nvarpar){diag(covRWADC[[k]]) <- diag(covRWADC[[k]]) + 1*10^-10}
       SCt[k,i] <-  SC[k] 
     }
-    if ((separate == FALSE) & (nnets > 1) & (densVar == TRUE)){
-      if (accMt > gaccMt){
-        SMt <- SMt*(1+fc*(1-(Sadapt-accMt)/(Sadapt-gaccMt)))  
-      } else {
-        SMt <- SMt/(1+fc*(1-(accMt/gaccMt)))
+   if ((nnets > 1)){
+      for (k in 1:nnets){
+        if (accM[k] > gaccM){
+          SMb[k] <- SMb[k]*(1+fc*(1-(Sadapt-accM[k])/(Sadapt-gaccM)))
+        } else {
+          SMb[k] <- SMb[k]/(1+fc*(1-(accM[k]/gaccM)))
+        }
+        SM[k] <- SMb[k]
+        if (densVar == TRUE){
+          covRWADM[[k]] <- SM[k]*matrix(colMeans(varMAD, na.rm = T), ncol=1)
+        } else {
+          covRWADM[[k]] <- SM[k]*cov(as.matrix(bsimsAD[,subM[k]]), use= "complete.obs")
+          if (length(eigen(covRWADM[[k]])$values[eigen(covRWADM[[k]])$values >1*10^-15]) < 1){covRWADM[[k]] <- 1*10^-8}
+        }
+        
       }
-      covRWADMt <- SMt*matrix(colMeans(varMAD, na.rm = T), ncol=1)
     }
   }
   selFpar  <- 1:nb 
-  MCMCsims <- cbind(varCAD[burn,c(1)], if (drandd>0) varMAD[burn,1], bsimsAD[burn,1:nb]) 
-  colnames(MCMCsims) <- c("actor variance", if (separate == FALSE & nnets > 1 & densVar == TRUE) c("density variance"), 
-                          all.vars(actor), all.vars(actor),
-                          if (separate == FALSE) {"density"}, if (nnets > 1) { if (separate == TRUE) {sprintf("density net %d",seq(1:nnets))} else { if (densVar == TRUE) sprintf("net %d",seq(1:nnets))}}, 
+  MCMCsims <- cbind(varCAD[burn,c(1)], if (densVar == TRUE) varMAD[burn,1], bsimsAD[burn,1:nb]) 
+  colnames(MCMCsims) <- c("actor variance", if (nnets > 1 & densVar == TRUE) c("density variance"), 
+                          all.vars(actor),  all.vars(actor),
+                          if (overalld == 1) {"density"}, if (nnets > 1) { if (overalld == 0) {sprintf("density net %d",seq(1:nnets))} else { if (densVar == TRUE) sprintf("net %d",seq(1:nnets))}}, 
                           all.vars(density))
-  z <- list(MCMCsims = MCMCsims, y = net, separate= separate, drandd=drandd, nrandd=nrandd, ns=ns, nre=nre, nd=nd-overalld-nrandd, acc=c(accvarS1,accvarS2,accvarS3))
-  class(z) <- c("b2ML")
+  z <- list(MCMCsims = MCMCsims, y = net, separateSigma = separateSigma, densVar = densVar, drandd=drandd, nrandd=nrandd, ns=ns, nre=nre, nd=nd-overalld-nrandd, acc=c(accvarS1,accvarS2,accvarS3), nnets=nnets)
+  class(z) <- c("b2MLb")
   return(z)
 }
