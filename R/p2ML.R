@@ -2,10 +2,11 @@ p2ML <- function (nets, sender = NULL, receiver = NULL, density =~ 1, reciprocit
 {
   # sampling parameters
   if(!is.null(adapt)){
-    Nadapt <- adapt
+    neff_min <- adapt
   } else {
-    Nadapt <- 250
+    neff_min <- 300
   } 
+  Nadapt <- 1000
   nccyc <- 1
   Sadapt <- 125
   gacc <- round(Sadapt*.234)
@@ -95,6 +96,12 @@ p2ML <- function (nets, sender = NULL, receiver = NULL, density =~ 1, reciprocit
   subCHCnets <- c(netnums, netnums + nnets)
   subCnets2 <- c(rep(0, nb[1]), netnums, netnums+nnets)
   subS1nets <- rep(1:nnets, each=nvarpar^2)
+  #22c aangepast
+  if (separateSigma == FALSE){
+    subS1nets_mcmcsims <- c(1,2,4)
+  } else {
+    subS1nets_mcmcsims <- sort(c((0:(nnets - 1)) * 4 + 1, (0:(nnets - 1)) * 4 + 2, (0:(nnets - 1)) * 4 + 4)) 
+  }
   if ((nnets > 1)){
     subb <- -c(drandd*((ns+nre+1+overalld):(ns+nre+nnets+overalld)),(nb+1):npar)
     subM <- c((ns+nre+overalld+1):(ns+nre+nrandd+overalld))
@@ -338,7 +345,11 @@ p2ML <- function (nets, sender = NULL, receiver = NULL, density =~ 1, reciprocit
   varr <- 0
   MSwM <- 0
   MSwR <- 0
-  for (i in 1:Nadapt){
+  MCMCsimsTMP <- matrix(rnorm(100), ncol = 10)
+  neff_min_obs <- min(t(apply(MCMCsimsTMP, 2, effectiveEst3)))
+  i <- 1
+  while ((neff_min_obs < neff_min) & (i < Nadapt)){
+    i <- i+1
     accb <- 0
     accr <- 0
     accC <- rep(0, nnets)
@@ -471,16 +482,21 @@ p2ML <- function (nets, sender = NULL, receiver = NULL, density =~ 1, reciprocit
         g4[subR] <- r
         ll1 <- unlist(lapply(1:nnets, function(k){sum(ll1C[[k]])}))
         rMat <- cbind(r) 
-        rsimsAD[((i-1)*Sadapt + j), ] <- g4
-        rsimsAD[((i-1)*Sadapt + j), subR] <- r
         if (recVar == TRUE){
           varS3 <- CholWishart::rInvWishart(1, postdfR, crossprod(rMat) + CPR)[,,1]
           VRR <- DR * varS3
           varRAD[((i-1)*Sadapt + j),] <- varS3
         }
+        rsimsAD[((i-1)*Sadapt + j), ] <- g4
+        rsimsAD[((i-1)*Sadapt + j), subR] <- r
       }
       callback()
     }
+    neff_min_obs <- min(t(apply(MCMCsimsTMP, 2, effectiveEst3)))
+    if (is.nan(neff_min_obs)){
+      neff_min_obs <- 0
+    }
+    callback2(neff_min_obs, neff_min)
     sumSadapt <- Sadapt*i
     sumgacc <- gacc*i
     sumaccb <- sumaccb + accb
@@ -555,16 +571,19 @@ p2ML <- function (nets, sender = NULL, receiver = NULL, density =~ 1, reciprocit
         }
       }
     }
+    MCMCsimsTMP <- cbind(varS1AD[,subS1nets_mcmcsims], if (densVar == TRUE) varMAD[,1], if (recVar == TRUE) varRAD[,1], bsimsAD[,1:nb], rsimsAD[,1:nr]) 
   } 
-  MCMCsims <- cbind(varCAD[burn,c(1,2,4)], if (densVar == TRUE) varMAD[burn,1], if (recVar == TRUE) varRAD[burn,1], bsimsAD[burn,1:nb], rsimsAD[burn,1:nr]) 
-  colnames(MCMCsims) <- c("sender variance", "sender receiver covariance","receiver variance", if (densVar == TRUE & nnets > 1) c("density variance"), 
+  MCMCsims <- cbind(varS1AD[burn, subS1nets_mcmcsims], if (densVar == TRUE) varMAD[burn,1], if (recVar == TRUE) varRAD[burn,1], bsimsAD[burn,1:nb], rsimsAD[burn,1:nr]) 
+  colnames(MCMCsims) <- c(if (separateSigma == FALSE) {c("sender variance", "sender receiver covariance","receiver variance")} 
+                          else {unlist(strsplit(sprintf("sender variance net %1$d, sender receiver covariance net %1$d, receiver variance net %1$d", seq(1:nnets)), ","))},
+                          if (densVar == TRUE & nnets > 1) c("density variance"), 
                           if (recVar == TRUE & nnets > 1) c("reciprocity variance"), all.vars(sender), all.vars(receiver), 
                           if (overalld == 1) {"density"}, if (nnets > 1) { if (overalld == 0) {sprintf("density net %d",seq(1:nnets))} else { if (densVar == TRUE) sprintf("net %d",seq(1:nnets))}}, 
                           all.vars(density), if (overallr == 1) {"reciprocity"}, 
                           if (nnets > 1) { if (overallr == 0) {sprintf("reciprocity net %d",seq(1:nnets))} else { if (recVar == TRUE) sprintf("net %d",seq(1:nnets))}}, 
                           all.vars(reciprocity))
   z <- list(MCMCsims = MCMCsims, y = net, densVar=densVar, recVar=recVar, drandd=drandd, drandr=drandr, nrandd=nrandd, nrandr=nrandr, ns=ns, nre=nre, nd=nd-overalld-nrandd, nr=nr-overallr-nrandr, acc=c(accvarS1,accvarS2,accvarS3), nnets=nnets)
-  class(z) <- c("2MLb")
+  class(z) <- c("2MLc")
   return(z)
 }
 

@@ -872,6 +872,18 @@ summary.b2MLb <- function(object, ...){
   return(round(output.matrix, digits=3))  
 }
 
+summary.b2MLc <- function(object, ...){
+  MCMCsims <- dplyr::select(as.data.frame(object$MCMCsims), -starts_with("net "))
+  output.matrix <- matrix(NA, dim(MCMCsims)[2], 10)
+  colnames(output.matrix) <- c("Estimate", "SE", "Q.5", "Q2.5", "Q25", "Q50", "Q75", "Q97.5", "Q99.5", "Neff")
+  rownames(output.matrix) <- colnames(MCMCsims)
+  output.matrix[,1] <- colMeans(MCMCsims, na.rm = T) 
+  output.matrix[,2] <- sqrt(diag(cov(MCMCsims, use = "pairwise.complete.obs")))
+  output.matrix[,3:9] <- t(apply(MCMCsims, 2, quantile, probs = c(0.5, 2.5, 25, 50, 75, 97.5, 99.5)/100, na.rm=T))
+  output.matrix[,10] <- t(apply(MCMCsims, 2, effectiveEst3))
+  return(round(output.matrix, digits=3))  
+}
+
 summary.2ML <- function(object, ...){
   MCMCsims <- object$MCMCsims[ , c(1:3, if (object$drandd>0) 3+object$drandd, if (object$drandr>0) 3+object$drandd+object$drandr, 
                               if (object$ns>0) {(3+object$drandd+object$drandr+1):(3+object$drandd+object$drandr+object$ns)}, 
@@ -912,6 +924,20 @@ summary.2MLb <- function(object, ...){
   return(round(output.matrix, digits=3))  
 }
 
+summary.2MLc <- function(object, ...){
+  MCMCsims <- dplyr::select(as.data.frame(object$MCMCsims), -starts_with("net "))
+  output.matrix <- matrix(NA, dim(MCMCsims)[2], 10)
+  colnames(output.matrix) <- c("Estimate", "SE", "Q.5", "Q2.5", "Q25", "Q50", "Q75", "Q97.5", "Q99.5", "Neff")
+  rownames(output.matrix) <- colnames(MCMCsims)
+  output.matrix[,1] <- colMeans(MCMCsims, na.rm = T) 
+  output.matrix[,2] <- sqrt(diag(cov(MCMCsims, use = "pairwise.complete.obs")))
+  output.matrix[,3:9] <- t(apply(MCMCsims, 2, quantile, probs = c(0.5, 2.5, 25, 50, 75, 97.5, 99.5)/100, na.rm=T))
+  output.matrix[,10] <- t(apply(MCMCsims, 2, effectiveEst3))
+  return(round(output.matrix, digits=3))  
+}
+
 callback <- function(){}
+
+callback2 <- function(num1=NULL, num2=NULL){}
 
 

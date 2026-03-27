@@ -15,13 +15,13 @@ export(
 
 importFrom("mvtnorm", "dmvnorm")
 importFrom("stats", "cov", "model.matrix", "quantile", "rWishart",
-           "runif", "sd", "var", "dnorm")
+           "runif", "sd", "var", "dnorm", "rnorm")
 importFrom("MASS", "ginv")
 importFrom("CholWishart", "rInvWishart")
 importFrom("RcppZiggurat", "zsetseed")
 importFrom("Rfast", "rmvnorm", "dmvt")
-#importFrom("plyr", "rbind.fill.matrix")
+importFrom("dplyr", "select", "starts_with")
 #importFrom("utils", "txtProgressBar")
 
-S3method(summary, "b2MLb")
-S3method(summary, "2MLb")
+S3method(summary, "b2MLc")
+S3method(summary, "2MLc")

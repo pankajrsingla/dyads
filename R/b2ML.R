@@ -2,10 +2,11 @@ b2ML <- function (nets, actor = NULL, density = NULL, adapt = NULL, burnin = NUL
 {
   # sampling parameters
   if(!is.null(adapt)){
-    Nadapt <- adapt
+    neff_min <- adapt
   } else {
-    Nadapt <- 250
+    neff_min <- 300
   } 
+  Nadapt <- 1000
   nccyc <- 1
   Sadapt <- 125
   gacc <- round(Sadapt*.234)
@@ -85,6 +86,12 @@ b2ML <- function (nets, actor = NULL, density = NULL, adapt = NULL, burnin = NUL
   subCHCnets <- c(netnums, netnums + nnets)
   subCnets2 <- c(rep(0, nb[1]), netnums, netnums+nnets)
   subS1nets <- rep(1:nnets, each=nvarpar^2)
+  #22c aangepast
+  if (separateSigma == FALSE){
+    subS1nets_mcmcsims <- c(1)
+  } else {
+    subS1nets_mcmcsims <- c((0:(nnets - 1)) * 4 + 1) 
+  }
   if ((nnets > 1)){
     subb <- -c(drandd*((ns+nre+overalld+1):(ns+nre+nnets+overalld)),(nb+1):npar)
     subm <- c(ns+nre+1)
@@ -305,7 +312,11 @@ b2ML <- function (nets, actor = NULL, density = NULL, adapt = NULL, burnin = NUL
   varr <- 0
   MSwM <- 0
   MSwR <- 0
-  for (i in 1:Nadapt){
+  MCMCsimsTMP <- matrix(rnorm(100), ncol = 10)
+  neff_min_obs <- min(t(apply(MCMCsimsTMP, 2, effectiveEst3)))
+  i <- 1
+  while ((neff_min_obs < neff_min) & (i < Nadapt)){
+    i <- i+1
     accb <- 0
     accr <- 0
     accC <- rep(0, nnets)
@@ -410,6 +421,11 @@ b2ML <- function (nets, actor = NULL, density = NULL, adapt = NULL, burnin = NUL
       }
       callback()
     }
+    neff_min_obs <- min(t(apply(MCMCsimsTMP, 2, effectiveEst3)))
+    if (is.nan(neff_min_obs)){
+      neff_min_obs <- 0
+    }
+    callback2(neff_min_obs, neff_min)
     sumSadapt <- Sadapt*i
     sumgacc <- gacc*i
     sumaccb <- sumaccb + accb
@@ -441,7 +457,7 @@ b2ML <- function (nets, actor = NULL, density = NULL, adapt = NULL, burnin = NUL
       if (length(eigen(covRWADC[[k]])$values[eigen(covRWADC[[k]])$values >1*10^-15]) < nvarpar){diag(covRWADC[[k]]) <- diag(covRWADC[[k]]) + 1*10^-10}
       SCt[k,i] <-  SC[k] 
     }
-   if ((nnets > 1)){
+    if ((nnets > 1)){
       for (k in 1:nnets){
         if (accM[k] > gaccM){
           SMb[k] <- SMb[k]*(1+fc*(1-(Sadapt-accM[k])/(Sadapt-gaccM)))
@@ -458,14 +474,15 @@ b2ML <- function (nets, actor = NULL, density = NULL, adapt = NULL, burnin = NUL
         
       }
     }
+    MCMCsims <- cbind(varS1AD[, subS1nets_mcmcsims], if (densVar == TRUE) varMAD[,1], bsimsAD[,1:nb][,-c(subre)]) 
   }
-  selFpar  <- 1:nb 
-  MCMCsims <- cbind(varCAD[burn,c(1)], if (densVar == TRUE) varMAD[burn,1], bsimsAD[burn,1:nb]) 
-  colnames(MCMCsims) <- c("actor variance", if (nnets > 1 & densVar == TRUE) c("density variance"), 
-                          all.vars(actor),  all.vars(actor),
-                          if (overalld == 1) {"density"}, if (nnets > 1) { if (overalld == 0) {sprintf("density net %d",seq(1:nnets))} else { if (densVar == TRUE) sprintf("net %d",seq(1:nnets))}}, 
+  MCMCsims <- cbind(varS1AD[burn, subS1nets_mcmcsims], if (densVar == TRUE) varMAD[burn,1], bsimsAD[burn,1:nb][,-c(subre)]) 
+  colnames(MCMCsims) <- c(if (separateSigma == FALSE) {c("actor variance")} else {sprintf("actor variance net %1$d", seq(1:nnets))},
+                          if (nnets > 1 & densVar == TRUE) c("density variance"), all.vars(actor),
+                          if (overalld == 1) {"density"}, 
+                          if (nnets > 1) { if (overalld == 0) {sprintf("density net %d",seq(1:nnets))} else { if (densVar == TRUE) sprintf("net %d",seq(1:nnets))}}, 
                           all.vars(density))
   z <- list(MCMCsims = MCMCsims, y = net, separateSigma = separateSigma, densVar = densVar, drandd=drandd, nrandd=nrandd, ns=ns, nre=nre, nd=nd-overalld-nrandd, acc=c(accvarS1,accvarS2,accvarS3), nnets=nnets)
-  class(z) <- c("b2MLb")
+  class(z) <- c("b2MLc")
   return(z)
 }

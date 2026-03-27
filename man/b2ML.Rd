@@ -16,10 +16,10 @@ separateSigma= NULL, densVar = NULL, seed = NULL)
   \item{nets}{List with n dichotomous symmetric dependent networks.}
   \item{actor}{Optional matrix with a stacked actor covariate, corresponding to the n networks. Multiple actor covariates can be added as a formula object, see example below}
   \item{density}{Optional matrix with symmetric a stacked density covariate, with dimensions similar to the n dependent networks. Multiple density covariates can be added as a formula object, see example below}
-  \item{adapt}{Optional number of adaptive sequenses (default is 250).}
+  \item{adapt}{Optional minumum effective sample size to be reached for the model parameters before ending MCMC simulations (default is 300 for the total sample, including burn-in).}
   \item{burnin}{Optional specification of number of burn-in iterations (default is 5000).}
   \item{center}{Optional argument for centering predictors (default is TRUE).}
-  \item{separateSigma}{Optional argument for -internaly- estimating separate variance-covariance matrices for the random sender and receiver effects in the n dependent networks (default is FALSE).}
+  \item{separateSigma}{Optional argument for estimating separate variance matrices for the random actor effects in the dependent networks (default is FALSE).}
   \item{densVar}{Optional argument for estimating density variance at the network level instead of separate density effects (default is TRUE).}
   \item{seed}{Optional specification of random seed (delfault is 1).}
 }
