@@ -31,7 +31,7 @@ p2 <- function (net, sender = NULL, receiver = NULL , density = NULL, reciprocit
   } else {
     Nburn <- 10000
   } 
-  if(!is.null(burnin)){
+  if(!is.null(sample)){
     Nsamp <- sample
   } else {
     Nsamp <- 80000
@@ -101,7 +101,8 @@ p2 <- function (net, sender = NULL, receiver = NULL , density = NULL, reciprocit
       beta2 <- beta 
       beta2[1:nb] <- beta[1:nb] + as.vector(Rfast::rmvnorm(1, pmb[1:nb], as.matrix(covRWADb[1:nb, 1:nb])))
       g4s <- g4 + as.vector(Rfast::rmvnorm(1, pmr, as.matrix(covRWADr[1:nr, 1:nr])))
-      ll2 <- llp2(y, X, X4, beta2, g4s, M, My, R, rInd)
+      ll2  <- llp2(y, X, X4, beta2, g4s, M, My, R, rInd)
+      ll2 <- ifelse(is.nan(ll2), ll1-1E2, ll2)
       ll1br <- ll1 + mvtnorm::dmvnorm(t(c(beta[1:nb], g4)), mean= pmbr, sigma= pVbr)    
       ll2br <- ll2 + mvtnorm::dmvnorm(t(c(beta2[1:nb], g4s)), mean= pmbr, sigma= pVbr) 
       if (runif(1, min = 0, max = 1) <  min(1, exp(ll2br-ll1br))){
@@ -120,6 +121,7 @@ p2 <- function (net, sender = NULL, receiver = NULL , density = NULL, reciprocit
       beta2 <- beta
       beta2[(nb+1):npar] <- beta[(nb+1):npar] + as.vector(Rfast::rmvnorm(nact, c(0,0), covRWADC))
       ll2 <- llp2(y, X, X4, beta2, g4, M, My, R, rInd)
+      ll2 <- ifelse(is.nan(ll2), ll1-1E2, ll2)
       ll1C <- ll1 + sum(log(mvtnorm::dmvnorm(c, mean= c(0,0), sigma= varAD)))   
       c2 <- cbind(beta2[c((nb[1]+1):(nb[1]+nact))], beta2[c((nb[1]+nact+1):npar)])
       ll2C <- ll2 + sum(log(mvtnorm::dmvnorm(c2, mean= c(0,0), sigma= varAD)))
@@ -157,6 +159,7 @@ p2 <- function (net, sender = NULL, receiver = NULL , density = NULL, reciprocit
     # update progress bar
     #Sys.sleep(0.1)
     #setTxtProgressBar(pb, i)
+    callback2(i, Nadapt+Nburn+Nsamp)
   } 
   #close(pb)
   # Burn in
@@ -176,6 +179,7 @@ p2 <- function (net, sender = NULL, receiver = NULL , density = NULL, reciprocit
     beta2[1:nb] <- beta[1:nb] + as.vector(Rfast::rmvnorm(1, pmb[1:nb], as.matrix(covRWADb[1:nb, 1:nb])))
     g4s <- g4 + as.vector(Rfast::rmvnorm(1, pmr, as.matrix(covRWADr[1:nr, 1:nr])))
     ll2 <- llp2(y, X, X4, beta2, g4s, M, My, R, rInd)
+    ll2 <- ifelse(is.nan(ll2), ll1-1E2, ll2)
     ll1br <- ll1 + log(mvtnorm::dmvnorm(t(c(beta[1:nb], g4)), mean= pmbr, sigma= pVbr))    
     ll2br <- ll2 + log(mvtnorm::dmvnorm(t(c(beta2[1:nb], g4s)), mean= pmbr, sigma= pVbr))    
     if (runif(1, min = 0, max = 1) <  min(1, exp(ll2br-ll1br))){
@@ -192,6 +196,7 @@ p2 <- function (net, sender = NULL, receiver = NULL , density = NULL, reciprocit
     beta2 <- beta
     beta2[(nb+1):npar] <- beta[(nb+1):npar] + as.vector(Rfast::rmvnorm(nact, c(0,0), covRWADC))
     ll2 <- llp2(y, X, X4, beta2, g4, M, My, R, rInd)
+    ll2 <- ifelse(is.nan(ll2), ll1-1E2, ll2)
     ll1C <- ll1 + sum(log(mvtnorm::dmvnorm(c, mean= c(0,0), sigma= varBI)))   
     c2 <- cbind(beta2[c((nb[1]+1):(nb[1]+nact))], beta2[c((nb[1]+nact+1):npar)])
     ll2C <- ll2 + sum(log(mvtnorm::dmvnorm(c2, mean= c(0,0), sigma= varBI)))
@@ -209,6 +214,7 @@ p2 <- function (net, sender = NULL, receiver = NULL , density = NULL, reciprocit
     # update progress bar
     #Sys.sleep(0.1)
     #setTxtProgressBar(pb, i)
+    callback2(Nadapt+i, Nadapt+Nburn+Nsamp)
   } 
   #close(pb)
   # Sample
@@ -225,6 +231,7 @@ p2 <- function (net, sender = NULL, receiver = NULL , density = NULL, reciprocit
     beta2[1:nb] <- beta[1:nb] + as.vector(Rfast::rmvnorm(1, pmb[1:nb], as.matrix(covRWADb[1:nb, 1:nb])))
     g4s <- g4 + as.vector(Rfast::rmvnorm(1, pmr, as.matrix(covRWADr[1:nr, 1:nr])))
     ll2 <- llp2(y, X, X4, beta2, g4s, M, My, R, rInd)
+    ll2 <- ifelse(is.nan(ll2), ll1-1E2, ll2)
     ll1br <- ll1 + log(mvtnorm::dmvnorm(t(c(beta[1:nb], g4)), mean= pmbr, sigma= pVbr))    
     ll2br <- ll2 + log(mvtnorm::dmvnorm(t(c(beta2[1:nb], g4s)), mean= pmbr, sigma= pVbr))    
     if (runif(1, min = 0, max = 1) <  min(1, exp(ll2br-ll1br))){
@@ -241,6 +248,7 @@ p2 <- function (net, sender = NULL, receiver = NULL , density = NULL, reciprocit
     beta2 <- beta
     beta2[(nb+1):npar] <- beta[(nb+1):npar] + as.vector(Rfast::rmvnorm(nact, c(0,0), covRWADC))
     ll2 <- llp2(y, X, X4, beta2, g4, M, My, R, rInd)
+    ll2 <- ifelse(is.nan(ll2), ll1-1E2, ll2)
     ll1C <- ll1 + sum(log(mvtnorm::dmvnorm(c, mean= c(0,0), sigma= vartmp)))   
     c2 <- cbind(beta2[c((nb[1]+1):(nb[1]+nact))], beta2[c((nb[1]+nact+1):npar)])
     ll2C <- ll2 + sum(log(mvtnorm::dmvnorm(c2, mean= c(0,0), sigma= vartmp)))
@@ -258,6 +266,7 @@ p2 <- function (net, sender = NULL, receiver = NULL , density = NULL, reciprocit
     # update progress bar
     #Sys.sleep(0.1)
     #setTxtProgressBar(pb, i)
+    callback2(Nadapt+Nburn+i, Nadapt+Nburn+Nsamp)
   } 
   #close(pb) 
   output.matrix <- matrix(NA, nvarcovpar+nb+nr, 10)

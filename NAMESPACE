@@ -16,10 +16,10 @@ export(
 importFrom("mvtnorm", "dmvnorm")
 importFrom("stats", "cov", "model.matrix", "quantile", "rWishart",
            "runif", "sd", "var", "dnorm", "rnorm")
-importFrom("MASS", "ginv")
+importFrom("MASS", "ginv", "mvrnorm")
 importFrom("CholWishart", "rInvWishart")
-importFrom("RcppZiggurat", "zsetseed")
-importFrom("Rfast", "rmvnorm", "dmvt")
+#importFrom("RcppZiggurat", "zsetseed")
+#importFrom("Rfast", "rmvnorm", "dmvt")
 importFrom("dplyr", "select", "starts_with")
 #importFrom("utils", "txtProgressBar")
 

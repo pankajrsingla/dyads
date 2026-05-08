@@ -39,10 +39,8 @@ b2ML <- function (nets, actor = NULL, density = NULL, adapt = NULL, burnin = NUL
   } 
   if(!is.null(seed)){
     set.seed(seed)
-    RcppZiggurat::zsetseed(seed)
   } else {
     set.seed(1)
-    RcppZiggurat::zsetseed(1)
   } 
   # obtain model
   nnets <- length(nets)
@@ -252,7 +250,7 @@ b2ML <- function (nets, actor = NULL, density = NULL, adapt = NULL, burnin = NUL
   VRM <- DM * varS2
   VRR <- DR * varS3
   # intialiseer random effecten op waarden ongelijk aan nul
-  beta[c(subC)] <- rep(Ccenter(Rfast::rmvnorm(nact, mu= c(0), sigma= pVC[1,1]), netnums), 2)
+  beta[c(subC)] <- rep(Ccenter(MASS::mvrnorm(nact,  c(0),  pVC[1,1]), netnums), 2)
   if ((nnets > 1)){
     beta[c(subM)] <- rep(c(0), nrandd)
     rwM <- rep(c(0), nrandd)
@@ -331,11 +329,11 @@ b2ML <- function (nets, actor = NULL, density = NULL, adapt = NULL, burnin = NUL
       num <- ((i-1)*Sadapt + j)
       if (length(beta[c(subb)]) > 0){
         beta2 <- beta 
-        beta2[c(subb)] <- beta[c(subb)] +as.vector(Rfast::rmvnorm(1,pmb[c(subb)], covRWADb))
+        beta2[c(subb)] <- beta[c(subb)] +as.vector(MASS::mvrnorm(1,pmb[c(subb)], covRWADb))
         ll2C <- lapply(1:nnets, function(k){llb2MLC(yl[[k]], nets[[k]], Xl[[k]], c(beta2[1:nb], beta2[subCnets==k]), Ml[[k]], Myl[[k]])})
         ll2 <- unlist(lapply(1:nnets, function(k){sum(ll2C[[k]])/2}))
-        ll1br <- sum(ll1) + Rfast::dmvnorm(t(c(beta[c(subb)])), mu= pmbr, sigma= pVbr, logged = TRUE)
-        ll2br <- sum(ll2) + Rfast::dmvnorm(t(c(beta2[c(subb)])), mu= pmbr, sigma= pVbr, logged = TRUE)
+        ll1br <- sum(ll1) + dmvnorm(t(c(beta[c(subb)])), mean= pmbr, sigma= pVbr, log = TRUE)
+        ll2br <- sum(ll2) + dmvnorm(t(c(beta2[c(subb)])), mean= pmbr, sigma= pVbr, log = TRUE)
         if (runif(1, min = 0, max = 1) <  min(1, exp(ll2br-ll1br))){
           bsimsAD[((i-1)*Sadapt + j), ] <- beta2
           beta <- beta2
@@ -351,14 +349,14 @@ b2ML <- function (nets, actor = NULL, density = NULL, adapt = NULL, burnin = NUL
       for (ccyc in 1:nccyc){
         beta2 <- beta
         for (k in 1:nnets){
-          betaC2tmp[netnums==k,] <-  rep(Rfast::rmvnorm(nactnets[k], mu= c(0), sigma= covRWADC[[k]][1,1]), 2)
+          betaC2tmp[netnums==k,] <-  rep(MASS::mvrnorm(nactnets[k],  c(0),  covRWADC[[k]][1,1]), 2)
           
         }
         c2 <- c + betaC2tmp
         beta2[c(subC)] <- beta[c(subC)] + as.vector(betaC2tmp)
         ll2C <- lapply(1:nnets, function(k){llb2MLC(yl[[k]], nets[[k]], Xl[[k]], c(beta2[1:nb], beta2[subCnets==k]),  Ml[[k]], Myl[[k]])})
-        ll1CpC <- unlist(lapply(1:nnets, function(k){sum(ll1C[[k]])/2})) + lpC(c, varS1, netnums, tmplpC)/2 #+ lpCm2(ctmp, alphaC, netnums, tmplpC) 
-        ll2CpC <- unlist(lapply(1:nnets, function(k){sum(ll2C[[k]])/2})) + lpC(c2, varS1, netnums, tmplpC)/2 #+ lpCm2(c2tmp, alphaC, netnums, tmplpC) 
+        ll1CpC <- unlist(lapply(1:nnets, function(k){sum(ll1C[[k]])/2})) + lpC(c, varS1, netnums, tmplpC)/2 
+        ll2CpC <- unlist(lapply(1:nnets, function(k){sum(ll2C[[k]])/2})) + lpC(c2, varS1, netnums, tmplpC)/2 
         for (k in 1:nnets){
           if (runif(1, min = 0, max = 1) <  min(1, exp(ll2CpC[k]-ll1CpC[k]))){
             ll1C[[k]] <- ll2C[[k]]  
@@ -388,7 +386,7 @@ b2ML <- function (nets, actor = NULL, density = NULL, adapt = NULL, burnin = NUL
         mOld <- m
         beta2 <- beta
         for (k in 1:nnets){
-          rwM[k] <-  Rfast::rmvnorm(1, mu= c(0), sigma= covRWADM[[k]])
+          rwM[k] <-  MASS::mvrnorm(1,  c(0),  covRWADM[[k]])
         }
         m2 <-  beta[subM] + rwM
         beta2[subM] <- m2
@@ -419,7 +417,7 @@ b2ML <- function (nets, actor = NULL, density = NULL, adapt = NULL, burnin = NUL
           varMAD[((i-1)*Sadapt + j),] <- varS2 
         }
       }
-      callback()
+      #callback()
     }
     neff_min_obs <- min(t(apply(MCMCsimsTMP, 2, effectiveEst3)))
     if (is.nan(neff_min_obs)){
@@ -471,10 +469,9 @@ b2ML <- function (nets, actor = NULL, density = NULL, adapt = NULL, burnin = NUL
           covRWADM[[k]] <- SM[k]*cov(as.matrix(bsimsAD[,subM[k]]), use= "complete.obs")
           if (length(eigen(covRWADM[[k]])$values[eigen(covRWADM[[k]])$values >1*10^-15]) < 1){covRWADM[[k]] <- 1*10^-8}
         }
-        
       }
     }
-    MCMCsims <- cbind(varS1AD[, subS1nets_mcmcsims], if (densVar == TRUE) varMAD[,1], bsimsAD[,1:nb][,-c(subre)]) 
+    MCMCsimsTMP <- cbind(varS1AD[, subS1nets_mcmcsims], if (densVar == TRUE) varMAD[,1], bsimsAD[,1:nb][,-c(subre)]) 
   }
   MCMCsims <- cbind(varS1AD[burn, subS1nets_mcmcsims], if (densVar == TRUE) varMAD[burn,1], bsimsAD[burn,1:nb][,-c(subre)]) 
   colnames(MCMCsims) <- c(if (separateSigma == FALSE) {c("actor variance")} else {sprintf("actor variance net %1$d", seq(1:nnets))},

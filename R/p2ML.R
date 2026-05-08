@@ -46,10 +46,8 @@ p2ML <- function (nets, sender = NULL, receiver = NULL, density =~ 1, reciprocit
   } 
   if(!is.null(seed)){
     set.seed(seed)
-    RcppZiggurat::zsetseed(seed)
   } else {
     set.seed(1)
-    RcppZiggurat::zsetseed(1)
   } 
   # obtain model
   nnets <- length(nets)
@@ -275,7 +273,7 @@ p2ML <- function (nets, sender = NULL, receiver = NULL, density =~ 1, reciprocit
   EvarS3 <- pVR
   VRM <- DM * varS2
   VRR <- DR * varS3
-  beta[c(subC)] <- Ccenter(Rfast::rmvnorm(nact, mu= c(0,0), sigma= pVC), netnums)
+  beta[c(subC)] <- Ccenter(MASS::mvrnorm(nact,  c(0,0),  pVC), netnums)
   if ((nnets > 1)){
     beta[c(subM)] <- rep(c(0), nrandd)
     rwM <- rep(c(0), nrandd)
@@ -363,13 +361,13 @@ p2ML <- function (nets, sender = NULL, receiver = NULL, density =~ 1, reciprocit
     for (j in 1:Sadapt){ 
       num <- ((i-1)*Sadapt + j)
       beta2 <- beta 
-      beta2[c(subb)] <- beta[c(subb)] +as.vector(Rfast::rmvnorm(1,pmb[c(subb)], covRWADb))
+      beta2[c(subb)] <- beta[c(subb)] +as.vector(MASS::mvrnorm(1,pmb[c(subb)], covRWADb))
       g4s <- g4
-      g4s[c(subr)] <- g4[c(subr)] + as.vector(Rfast::rmvnorm(1, pmr[c(subr)], covRWADr))
+      g4s[c(subr)] <- g4[c(subr)] + as.vector(MASS::mvrnorm(1, pmr[c(subr)], covRWADr))
       ll2C <- lapply(1:nnets, function(k){llp2ML(yl[[k]], nets[[k]], Xl[[k]], X4l[[k]], c(beta2[1:nb], beta2[subCnets==k]), g4s, Ml[[k]], Myl[[k]], Rl[[k]], rInd[[k]])})
       ll2 <- unlist(lapply(1:nnets, function(k){sum(ll2C[[k]])}))
-      ll1br <- sum(ll1) + Rfast::dmvnorm(t(c(beta[c(subb)], g4[subr])), mu= pmbr, sigma= pVbr, logged = TRUE)
-      ll2br <- sum(ll2) + Rfast::dmvnorm(t(c(beta2[c(subb)], g4s[subr])), mu= pmbr, sigma= pVbr, logged = TRUE)
+      ll1br <- sum(ll1) + dmvnorm(t(c(beta[c(subb)], g4[subr])), mean= pmbr, sigma= pVbr, log = TRUE)
+      ll2br <- sum(ll2) + dmvnorm(t(c(beta2[c(subb)], g4s[subr])), mean= pmbr, sigma= pVbr, log = TRUE)
       if (runif(1, min = 0, max = 1) <  min(1, exp(ll2br-ll1br))){
         bsimsAD[((i-1)*Sadapt + j), ] <- beta2
         beta <- beta2
@@ -388,7 +386,7 @@ p2ML <- function (nets, sender = NULL, receiver = NULL, density =~ 1, reciprocit
         beta2 <- beta
         cOld <- c
         for (k in 1:nnets){
-          betaC2tmp[netnums==k,] <-  Rfast::rmvnorm(nactnets[k], mu= c(0,0), sigma= covRWADC[[k]])
+          betaC2tmp[netnums==k,] <-  MASS::mvrnorm(nactnets[k],  c(0,0),  covRWADC[[k]])
         }
         c2 <- c + betaC2tmp
         beta2[c(subC)] <- beta[c(subC)] + as.vector(betaC2tmp)
@@ -423,7 +421,7 @@ p2ML <- function (nets, sender = NULL, receiver = NULL, density =~ 1, reciprocit
         #
         beta2 <- beta
         for (k in 1:nnets){
-          rwM[k] <-  Rfast::rmvnorm(1, mu= c(0), sigma= covRWADM[[k]])
+          rwM[k] <-  MASS::mvrnorm(1,  c(0),  covRWADM[[k]])
         }
         m2 <-  beta[subM] + rwM
         beta2[subM] <- m2
@@ -459,7 +457,7 @@ p2ML <- function (nets, sender = NULL, receiver = NULL, density =~ 1, reciprocit
         rOld <- r
         g4s <- g4
         for (k in 1:nnets){
-          rwR[k] <-  Rfast::rmvnorm(1, mu= c(0), sigma= covRWADR[[k]])
+          rwR[k] <-  MASS::mvrnorm(1,  c(0),  covRWADR[[k]])
         }
         r2 <-  g4[subR] + rwR
         g4s[subR] <- r2
@@ -490,7 +488,7 @@ p2ML <- function (nets, sender = NULL, receiver = NULL, density =~ 1, reciprocit
         rsimsAD[((i-1)*Sadapt + j), ] <- g4
         rsimsAD[((i-1)*Sadapt + j), subR] <- r
       }
-      callback()
+      #callback()
     }
     neff_min_obs <- min(t(apply(MCMCsimsTMP, 2, effectiveEst3)))
     if (is.nan(neff_min_obs)){

@@ -760,17 +760,11 @@ llj2MLC <- function (y, Y, X, X4, beta, g4, M, My, R, cSign){
 lpC <- function(var, list, grp, vec) {
   for (i in 1:max(grp)){
     vec[i] <-  sum(Rfast::dmvnorm(var[grp==i,], mu= c(0,0), sigma= list[[i]], logged = TRUE))
+    #vec[i] <-  sum(mvtnorm::dmvnorm(var[grp==i,], mean = c(0,0), sigma= list[[i]], log = TRUE))
   }    
   return(vec)
 }
 
-lpCt <- function(var, list, grp, df, vec) {
-  for (i in 1:max(grp)){
-    #vec[i] <-  sum(Rfast::dmvnorm(var[grp==i,], mu= c(0,0), sigma= list[[i]], logged = TRUE))
-    vec[i] <-  sum(Rfast::dmvt(var[grp==i,], mu= c(0,0), sigma= list[[i]], nu = df, logged = TRUE))
-  }    
-  return(vec)
-}
 
 # log Gelman likelihood mu
 lGlm <- function(par, sdPar){

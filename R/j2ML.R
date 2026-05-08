@@ -46,10 +46,8 @@ j2ML <- function (nets, sender = NULL, receiver = NULL, density =~ 1, reciprocit
   } 
   if(!is.null(seed)){
     set.seed(seed)
-    RcppZiggurat::zsetseed(seed)
   } else {
     set.seed(1)
-    RcppZiggurat::zsetseed(1)
   } 
   # obtain model
   nnets <- length(nets)
@@ -276,7 +274,7 @@ j2ML <- function (nets, sender = NULL, receiver = NULL, density =~ 1, reciprocit
   EvarS3 <- pVR
   VRM <- DM * varS2
   VRR <- DR * varS3
-  beta[c(subC)] <- Ccenter(Rfast::rmvnorm(nact, mu= c(0,0), sigma= pVC), netnums)
+  beta[c(subC)] <- Ccenter(MASS::mvrnorm(nact,  c(0,0),  pVC), netnums)
   if ((nnets > 1)){
     beta[c(subM)] <- rep(c(0), nrandd)
     rwM <- rep(c(0), nrandd)
@@ -364,9 +362,9 @@ j2ML <- function (nets, sender = NULL, receiver = NULL, density =~ 1, reciprocit
     for (j in 1:Sadapt){ 
       num <- ((i-1)*Sadapt + j)
       beta2 <- beta 
-      beta2[c(subb)] <- beta[c(subb)] +as.vector(Rfast::rmvnorm(1,pmb[c(subb)], covRWADb))
+      beta2[c(subb)] <- beta[c(subb)] +as.vector(MASS::mvrnorm(1,pmb[c(subb)], covRWADb))
       g4s <- g4
-      g4s[c(subr)] <- g4[c(subr)] + as.vector(Rfast::rmvnorm(1, pmr[c(subr)], covRWADr))
+      g4s[c(subr)] <- g4[c(subr)] + as.vector(MASS::mvrnorm(1, pmr[c(subr)], covRWADr))
       ll2C <- lapply(1:nnets, function(k){llj2MLC(yl[[k]], nets[[k]], Xl[[k]], X4l[[k]], c(beta2[1:nb], beta2[subCnets==k]), g4s, Ml[[k]], Myl[[k]], Rl[[k]], cSignl[[k]])})
       ll2 <- unlist(lapply(1:nnets, function(k){sum(ll2C[[k]])}))
       ll1br <- sum(ll1) + sum(lGlm(beta[c(subb)], sdXm[c(subb)])) + sum(lGlr(g4[c(subr)], sdXr[c(subr)]))
@@ -389,13 +387,13 @@ j2ML <- function (nets, sender = NULL, receiver = NULL, density =~ 1, reciprocit
         beta2 <- beta
         cOld <- c
         for (k in 1:nnets){
-          betaC2tmp[netnums==k,] <-  Rfast::rmvnorm(nactnets[k], mu= c(0,0), sigma= covRWADC[[k]])
+          betaC2tmp[netnums==k,] <-  MASS::mvrnorm(nactnets[k],  c(0,0),  covRWADC[[k]])
         }
         c2 <- c + betaC2tmp
         beta2[c(subC)] <- beta[c(subC)] + as.vector(betaC2tmp)
         ll2C <- lapply(1:nnets, function(k){llj2MLC(yl[[k]], nets[[k]], Xl[[k]], X4l[[k]], c(beta2[1:nb], beta2[subCnets==k]), g4, Ml[[k]], Myl[[k]], Rl[[k]], cSignl[[k]])})
-        ll1CpC <- unlist(lapply(1:nnets, function(k){sum(ll1C[[k]])})) + lpC(c, varS1, netnums, tmplpC) #+ lpCm2(ctmp, alphaC, netnums, tmplpC) 
-        ll2CpC <-  unlist(lapply(1:nnets, function(k){sum(ll2C[[k]])})) + lpC(c2, varS1, netnums, tmplpC) #+ lpCm2(c2tmp, alphaC, netnums, tmplpC) 
+        ll1CpC <- unlist(lapply(1:nnets, function(k){sum(ll1C[[k]])})) + lpC(c, varS1, netnums, tmplpC) 
+        ll2CpC <-  unlist(lapply(1:nnets, function(k){sum(ll2C[[k]])})) + lpC(c2, varS1, netnums, tmplpC)
         for (k in 1:nnets){
           if (runif(1, min = 0, max = 1) <  min(1, exp(ll2CpC[k]-ll1CpC[k]))){
             ll1C[[k]] <- ll2C[[k]]  
@@ -417,14 +415,14 @@ j2ML <- function (nets, sender = NULL, receiver = NULL, density =~ 1, reciprocit
           }
         }
         varS1AD[((i-1)*Sadapt + j),] <- unlist(varS1)
-        varCAD[((i-1)*Sadapt + j),] <- apply(simplify2array(varS1), 1:2, mean) #- apply(simplify2array(varc), 1:2, mean)
+        varCAD[((i-1)*Sadapt + j),] <- apply(simplify2array(varS1), 1:2, mean) 
       }
       # random effects M and R
       if ((nnets > 1)){
         #
         beta2 <- beta
         for (k in 1:nnets){
-          rwM[k] <-  Rfast::rmvnorm(1, mu= c(0), sigma= covRWADM[[k]])
+          rwM[k] <-  MASS::mvrnorm(1,  c(0),  covRWADM[[k]])
         }
         m2 <-  beta[subM] + rwM
         beta2[subM] <- m2
@@ -460,7 +458,7 @@ j2ML <- function (nets, sender = NULL, receiver = NULL, density =~ 1, reciprocit
         rOld <- r
         g4s <- g4
         for (k in 1:nnets){
-          rwR[k] <-  Rfast::rmvnorm(1, mu= c(0), sigma= covRWADR[[k]])
+          rwR[k] <-  MASS::mvrnorm(1,  c(0),  covRWADR[[k]])
         }
         r2 <-  g4[subR] + rwR
         g4s[subR] <- r2
@@ -491,7 +489,7 @@ j2ML <- function (nets, sender = NULL, receiver = NULL, density =~ 1, reciprocit
         rsimsAD[((i-1)*Sadapt + j), ] <- g4
         rsimsAD[((i-1)*Sadapt + j), subR] <- r
       }
-      callback()
+      #callback()
     }
     neff_min_obs <- min(t(apply(MCMCsimsTMP, 2, effectiveEst3)))
     if (is.nan(neff_min_obs)){
